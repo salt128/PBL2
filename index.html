@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ネット利用学習アプリ</title>
+    <style>
+        /* 背景をカードに合わせた温かみのあるグラデーションに */
+        body { 
+            text-align: center; 
+            font-family: 'Helvetica Neue', Arial, sans-serif; 
+            background: linear-gradient(135deg, #ffedbc 0%, #ed4264 100%); 
+            background-attachment: fixed;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        /* スタート画面：中央配置と文字の装飾 */
+        #start-screen { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 90vh; 
+        }
+        #start-screen h1 { 
+            font-size: 2.5rem; 
+            color: white; 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 10px;
+        }
+
+        .start-btn { 
+            padding: 18px 50px; 
+            font-size: 1.8rem; 
+            background-color: #ffffff; 
+            color: #ed4264; 
+            border: none; 
+            border-radius: 50px; 
+            cursor: pointer; 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2); 
+            transition: 0.3s; 
+            font-weight: bold;
+        }
+        .start-btn:hover { transform: translateY(-5px); box-shadow: 0 15px 25px rgba(0,0,0,0.3); }
+        .start-btn:disabled { background-color: #ccc; color: #999; cursor: not-allowed; }
+
+        /* メイン画面 */
+        #main-content { display: none; padding-top: 20px; }
+
+        /* カードのスタイル：画像を利用 */
+        .card-container { display: flex; justify-content: center; gap: 30px; margin-bottom: 30px; }
+        .card { 
+            width: 320px;  /* 160px → 320px */
+            height: 440px; /* 220px → 440px */
+            border-radius: 25px; /* 角丸も少し大きく */
+            cursor: pointer; 
+            box-shadow: 0 12px 25px rgba(0,0,0,0.2); 
+            background-size: cover; 
+            background-position: center; 
+            transition: 0.3s; 
+            border: 6px solid white; /* 枠線も少し太く */
+        }
+
+        /* カード同士が重ならないよう間隔を広げる */
+        .card-container { 
+            display: flex; 
+            justify-content: center; 
+            gap: 50px; /* 30px → 50px */
+            margin-bottom: 40px; 
+            flex-wrap: wrap; /* 画面が狭い時に自動で折り返すように設定 */
+        }
+
+        /* モバイル対応：画面が小さい時はサイズを自動調整 */
+        @media (max-width: 700px) {
+            .card {
+                width: 140px;
+                height: 190px;
+            }
+            .card-container {
+                gap: 20px;
+            }
+        }
+
+        .card:hover { transform: rotate(-3deg) scale(1.1); }
+        
+        .red { background-image: url('赤マス用カード.png'); }
+        .yellow { background-image: url('黄マス用カード.png'); }
+
+        /* 表示エリア：角丸と白背景で清潔感を */
+        #display-box { 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 30px; 
+            border-radius: 25px; 
+            min-height: 250px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+            max-width: 550px; 
+            margin: 0 auto; 
+        }
+
+        #timer-display { font-size: 2.5rem; color: #e74c3c; font-weight: bold; margin-bottom: 15px; }
+        #topic-text { font-size: 1.3rem; line-height: 1.6; font-weight: bold; }
+
+        .quiz-btns { display: none; justify-content: center; gap: 30px; margin-top: 25px; }
+        .ox-btn { font-size: 2.5rem; width: 80px; height: 80px; border-radius: 50%; border: none; cursor: pointer; color: white; transition: 0.2s; }
+        .maru { background-color: #2ecc71; box-shadow: 0 5px 0 #27ae60; }
+        .batsu { background-color: #e74c3c; box-shadow: 0 5px 0 #c0392b; }
+        .ox-btn:active { transform: translateY(3px); box-shadow: none; }
+
+        #result { margin-top: 20px; font-weight: bold; font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1>ネット利用学習アプリ</h1>
+        <p id="loading-msg" style="color: white;">データを読み込んでいます...</p>
+        <button id="start-button" class="start-btn" onclick="enterApp()" disabled>スタート</button>
+    </div>
+
+    <div id="main-content">
+        <h2 style="color: white; text-shadow: 1px 1px 3px rgba(0,0,0,0.2);">カードを選んでね！</h2>
+        <div class="card-container">
+            <div class="card red" onclick="startQuiz()"></div>
+            <div class="card yellow" onclick="showDiscussion()"></div>
+        </div>
+
+        <div id="display-box">
+            <div id="timer-display"></div>
+            <p id="topic-text">止まったマス色のカードを選ぼう</p>
+            <div id="quiz-area" class="quiz-btns">
+                <button id="btn-maru" class="ox-btn maru" onclick="checkAnswer(true)">○</button>
+                <button id="btn-batsu" class="ox-btn batsu" onclick="checkAnswer(false)">×</button>
+            </div>
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- ここからJavaScript（タイマー、GAS連携、画面切り替え） ---
+        let quizStock = [];
+        let discussionStock = [];
+        let countdown;
+        let timeLeft;
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbxjTo8KY7NhO3HpgSiLto-x4rF2NNOqTG11AK7GShyVrLFe8-ige0C8BaCyx5IqCoFg/exec";
+
+        window.onload = async () => {
+            try {
+                const response = await fetch(GAS_URL);
+                const data = await response.json();
+                quizStock = data.quizzes;
+                discussionStock = data.discussions;
+                document.getElementById('loading-msg').innerText = "準備ができました！";
+                document.getElementById('start-button').disabled = false;
+            } catch (e) {
+                document.getElementById('loading-msg').innerText = "通信エラー：再読み込みしてください";
+            }
+        };
+
+        function enterApp() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+        }
+
+        function startTimer(seconds, onComplete) {
+            clearInterval(countdown);
+            timeLeft = seconds;
+            const timerDiv = document.getElementById('timer-display');
+            timerDiv.style.display = "block";
+            timerDiv.style.color = "#e74c3c";
+            timerDiv.innerText = `残り: ${timeLeft}秒`;
+
+            countdown = setInterval(() => {
+                timeLeft--;
+                if (timeLeft > 0) {
+                    timerDiv.innerText = `残り: ${timeLeft}秒`;
+                } else {
+                    clearInterval(countdown);
+                    timerDiv.innerText = "0秒（終了）";
+                    timerDiv.style.color = "#7f8c8d";
+                    onComplete();
+                }
+            }, 1000);
+        }
+
+        function startQuiz() {
+            if (quizStock.length === 0) return;
+            document.getElementById('result').innerText = "";
+            document.getElementById('quiz-area').style.display = "flex";
+            const quiz = quizStock[Math.floor(Math.random() * quizStock.length)];
+            window.currentQuiz = quiz;
+            document.getElementById('topic-text').innerText = "【クイズ】\n" + quiz.q;
+            setButtonsEnabled(true);
+            startTimer(30, () => {
+                setButtonsEnabled(false);
+                document.getElementById('result').innerText = "⏰ 時間切れ！";
+                document.getElementById('result').style.color = "#e67e22";
+            });
+        }
+
+        function showDiscussion() {
+            if (discussionStock.length === 0) return;
+            document.getElementById('quiz-area').style.display = "none";
+            document.getElementById('result').innerText = "";
+            const topic = discussionStock[Math.floor(Math.random() * discussionStock.length)];
+            document.getElementById('topic-text').innerText = "【お題】\n" + topic;
+            startTimer(30, () => {
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerText = "⌛ 終了\n自分の意見は言えたかな？\n言えたら3マス進もう！";
+                resultDiv.style.color = "#e67e22";
+            });
+        }
+
+        function checkAnswer(userAnswer) {
+            clearInterval(countdown);
+            setButtonsEnabled(false);
+            const resultDiv = document.getElementById('result');
+            const isCorrect = userAnswer === window.currentQuiz.a;
+            resultDiv.innerText = (isCorrect ? "⭕️ 正解！３マス進もう" : "❌ 不正解…") + "\n" + window.currentQuiz.comment;
+            resultDiv.style.color = isCorrect ? "#2ecc71" : "#e74c3c";
+        }
+
+        function setButtonsEnabled(enabled) {
+            document.getElementById('btn-maru').disabled = !enabled;
+            document.getElementById('btn-batsu').disabled = !enabled;
+        }
+    </script>
+</body>
+</html>
